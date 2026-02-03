@@ -1,0 +1,71 @@
+# Label definitions for the repository
+# Used by label-sync workflow
+
+# Review labels
+- name: ai-review-requested
+  color: "0E8A16"
+  description: "AI review has been requested"
+
+- name: needs-human-review
+  color: "D93F0B"
+  description: "Requires human review"
+
+- name: security
+  color: "B60205"
+  description: "Security-related changes - use Copilot review"
+
+- name: copilot-review
+  color: "6F42C1"
+  description: "Explicitly request Copilot review (uses quota)"
+
+# Status labels
+- name: stale
+  color: "EDEDED"
+  description: "Inactive issue/PR"
+
+- name: pinned
+  color: "006B75"
+  description: "Pinned - will not be auto-closed"
+
+- name: work-in-progress
+  color: "FBCA04"
+  description: "Work in progress - not ready for review"
+
+- name: critical
+  color: "B60205"
+  description: "Critical issue requiring immediate attention"
+
+# Type labels
+- name: enhancement
+  color: "A2EEEF"
+  description: "New feature or request"
+
+- name: bug
+  color: "D73A4A"
+  description: "Something is not working"
+
+- name: documentation
+  color: "0075CA"
+  description: "Documentation improvements"
+
+- name: refactor
+  color: "BFDADC"
+  description: "Code refactoring without new features"
+
+# Priority labels
+- name: priority/high
+  color: "D93F0B"
+  description: "High priority"
+
+- name: priority/medium
+  color: "FBCA04"
+  description: "Medium priority"
+
+- name: priority/low
+  color: "0E8A16"
+  description: "Low priority"
+
+# Jules/Agent labels
+- name: jules
+  color: "4285F4"
+  description: "Assign to Jules Google coding agent"
