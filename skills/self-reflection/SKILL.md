@@ -109,6 +109,12 @@ Store lessons in artifacts for persistence:
 
 ```
 brain/<conversation-id>/
-├── lessons_learned.md   # Accumulated insights
-└── reflection_log.md    # Detailed reflections
+├── lessons_learned.md   # Curated summary of critical insights
+└── reflection_log.md    # Full verbose reflection history
 ```
+
+**Storage Relationship:**
+
+- **`reflection_log.md`**: Full, verbose output of every reflection event
+- **`lessons_learned.md`**: Curated summary of most critical, actionable insights
+- **`ReflectionLog` (mcp-memory)**: Concise, recent lessons for quick retry access

@@ -69,11 +69,11 @@ then: Add "include tests in *.test.ts format"
 
 ```yaml
 # From past conversations
-preference: "user prefers TypeScript strict mode"
-apply: Add "with strict TypeScript checks"
+if: user preference is "TypeScript strict mode"
+then: Add "with strict TypeScript checks"
 
-preference: "user uses conventional commits"
-apply: Follow "feat/fix/docs/chore prefix format"
+if: user preference is "uses conventional commits"
+then: Follow "feat/fix/docs/chore prefix format"
 ```
 
 ## Prompt Enhancement Template
