@@ -1,0 +1,116 @@
+# Bitwarden Secrets Manager Setup for Autonomous Review Mesh
+#
+# This file documents the required secrets and their Bitwarden configuration.
+
+# ============================================================================
+# BITWARDEN PROJECT STRUCTURE
+# ============================================================================
+#
+# Project: google-services
+# ├── JULES_API-KEY_01  (Primary Google account)
+# ├── JULES_API-KEY_02  (Secondary Google account)
+# ├── JULES_API-KEY_03  (Tertiary Google account)
+# └── GEMINI_API-KEY    (Optional: for other Gemini uses)
+#
+# Project: github-tokens
+# └── GITHUB_PAT_automation  (If needed for cross-repo operations)
+#
+# Project: infrastructure
+# ├── PERPLEXITY_API-KEY_01
+# └── CLOUDFLARE_API_TOKEN
+
+# ============================================================================
+# SETUP INSTRUCTIONS
+# ============================================================================
+
+setup:
+  step_1_bitwarden:
+    description: "Create projects and add secrets in Bitwarden Secrets Manager"
+    actions:
+      - "Login to Bitwarden web vault"
+      - "Go to Secrets Manager"
+      - "Create project: google-services"
+      - "Add secrets for each Jules API key"
+      - "Note the UUID of each secret"
+
+  step_2_machine_account:
+    description: "Create a machine account for GitHub Actions"
+    actions:
+      - "In Bitwarden Secrets Manager, go to Machine Accounts"
+      - "Create new machine account: github-actions"
+      - "Grant access to google-services project"
+      - "Generate access token"
+      - "Copy the access token (shown only once!)"
+
+  step_3_github_secrets:
+    description: "Add Bitwarden access token to GitHub"
+    actions:
+      - "Go to GitHub repo → Settings → Secrets → Actions"
+      - "Add new secret: BW_ACCESS_TOKEN"
+      - "Paste the Bitwarden machine account access token"
+
+  step_4_update_workflow:
+    description: "Update workflow with your secret UUIDs"
+    actions:
+      - "Find your secret UUIDs in Bitwarden"
+      - "Update .github/workflows/autonomous-review-mesh.yml"
+      - "Replace JULES_API_KEY_01_UUID with actual UUID"
+      - "Replace JULES_API_KEY_02_UUID with actual UUID"
+      - "Replace JULES_API_KEY_03_UUID with actual UUID"
+
+# ============================================================================
+# SECRET ID MAPPING (UPDATE WITH YOUR VALUES)
+# ============================================================================
+
+secrets:
+  # Replace these placeholder UUIDs with your actual Bitwarden secret IDs
+  JULES_API_KEY_01:
+    bitwarden_uuid: "REPLACE_WITH_YOUR_UUID"
+    description: "Jules API key from Google Account #1"
+
+  JULES_API_KEY_02:
+    bitwarden_uuid: "REPLACE_WITH_YOUR_UUID"
+    description: "Jules API key from Google Account #2"
+
+  JULES_API_KEY_03:
+    bitwarden_uuid: "REPLACE_WITH_YOUR_UUID"
+    description: "Jules API key from Google Account #3"
+
+# ============================================================================
+# JULES SETUP (PER GOOGLE ACCOUNT)
+# ============================================================================
+
+jules_setup:
+  per_account:
+    - "Login to Google account in dedicated Chrome profile"
+    - "Go to https://jules.google"
+    - "Connect your GitHub repository"
+    - "Go to Settings → API"
+    - "Click 'Create key'"
+    - "Copy the API key"
+    - "Store in Bitwarden: google-services/JULES_API-KEY_0N"
+
+# ============================================================================
+# VERIFICATION
+# ============================================================================
+
+verification:
+  test_bitwarden:
+    command: |
+      # Test that secrets can be retrieved (run locally with bws CLI)
+      bws secret get <UUID> --access-token <TOKEN>
+
+  test_jules_api:
+    command: |
+      # Test Jules API connectivity
+      curl 'https://jules.googleapis.com/v1alpha/sources' \
+        -H 'X-Goog-Api-Key: YOUR_API_KEY'
+    expected: "List of connected GitHub repositories"
+
+  test_workflow:
+    steps:
+      - "Create a test PR"
+      - "Wait for AI reviewers"
+      - "Add a review comment requesting changes"
+      - "Observe workflow triggering Jules"
+      - "Verify Jules creates a fix PR"
