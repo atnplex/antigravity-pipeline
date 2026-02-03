@@ -1,0 +1,338 @@
+# Skills Manifest
+
+> **Version**: 1.0.0
+> **Updated**: 2026-02-02
+
+---
+
+## Remote Skill Sources
+
+```yaml
+sources:
+  - name: awesome-skills
+    url: https://github.com/sickn33/antigravity-awesome-skills
+    index: skills_index.json
+    skills: 100+
+    priority: 1
+
+  - name: guanyang-skills
+    url: https://github.com/guanyang/antigravity-skills
+    index: skills_index.json
+    skills: 30+
+    priority: 2
+
+  - name: baseline
+    path: /atn/baseline
+    local: true
+    priority: 0  # Highest priority
+```
+
+---
+
+## Local Skills
+
+```yaml
+local:
+  path: ~/skills/local/
+```
+
+---
+
+## File Type Linting & Formatting
+
+> Load these skills based on file extension to ensure proper formatting standards.
+
+### Mapping by Extension
+
+| Extension | Skill | Tools | Standard |
+|-----------|-------|-------|----------|
+| `.md` | markdown-lint | markdownlint, prettier | CommonMark + GFM |
+| `.sh`, `.bash` | shell-lint | shellcheck, shfmt | Google Shell Style |
+| `.py` | python-lint | ruff, black, mypy | PEP 8, PEP 484 |
+| `.json` | json-lint | prettier, jsonlint | RFC 8259 |
+| `.yaml`, `.yml` | yaml-lint | yamllint, prettier | YAML 1.2 |
+| `.go` | go-lint | gofmt, golangci-lint | Go Style |
+| `.ts`, `.tsx` | typescript-lint | eslint, prettier | Airbnb/Standard |
+| `.js`, `.jsx` | javascript-lint | eslint, prettier | Airbnb/Standard |
+| `.css`, `.scss` | css-lint | stylelint, prettier | BEM/TailwindCSS |
+| `.html` | html-lint | htmlhint, prettier | W3C |
+| `.dockerfile` | dockerfile-lint | hadolint | Best practices |
+| `.sql` | sql-lint | sqlfluff | PostgreSQL style |
+| `.rs` | rust-lint | rustfmt, clippy | Rust Style Guide |
+| `.toml` | toml-lint | taplo | TOML Spec |
+
+### File Type Skills Content
+
+```yaml
+markdown-lint:
+  tools:
+    - markdownlint
+    - prettier --parser markdown
+  rules:
+    - Line length: 120 chars
+    - Trailing spaces: remove
+    - Headers: ATX style (#)
+    - Lists: consistent markers
+  commands:
+    check: "markdownlint '**/*.md'"
+    fix: "prettier --write '**/*.md'"
+
+shell-lint:
+  tools:
+    - shellcheck
+    - shfmt
+  rules:
+    - Always use #!/bin/bash or #!/usr/bin/env bash
+    - Quote all variables
+    - Use [[ ]] for tests
+    - Indent: 2 spaces
+  commands:
+    check: "shellcheck *.sh"
+    fix: "shfmt -w -i 2 *.sh"
+
+python-lint:
+  tools:
+    - ruff (fast linter + formatter)
+    - mypy (type checking)
+  rules:
+    - PEP 8 compliance
+    - Type hints required
+    - Docstrings for public APIs
+    - Line length: 88 (black default)
+  commands:
+    check: "ruff check . && mypy ."
+    fix: "ruff format . && ruff check --fix ."
+
+json-lint:
+  tools:
+    - prettier
+    - jq (validation)
+  rules:
+    - Valid JSON (RFC 8259)
+    - Consistent indentation: 2 spaces
+    - Trailing commas: none
+  commands:
+    check: "jq empty *.json"
+    fix: "prettier --write '**/*.json'"
+
+yaml-lint:
+  tools:
+    - yamllint
+    - prettier
+  rules:
+    - YAML 1.2 spec
+    - Indent: 2 spaces
+    - No duplicate keys
+    - Quote strings with special chars
+  commands:
+    check: "yamllint ."
+    fix: "prettier --write '**/*.{yml,yaml}'"
+
+go-lint:
+  tools:
+    - gofmt
+    - golangci-lint
+  rules:
+    - Official Go style (gofmt enforced)
+    - Effective Go patterns
+    - Error handling required
+  commands:
+    check: "golangci-lint run"
+    fix: "gofmt -w ."
+
+typescript-lint:
+  tools:
+    - eslint
+    - prettier
+    - tsc (type check)
+  rules:
+    - Strict mode
+    - Explicit return types
+    - No any (prefer unknown)
+    - Consistent imports
+  commands:
+    check: "eslint . && tsc --noEmit"
+    fix: "eslint --fix . && prettier --write '**/*.{ts,tsx}'"
+
+dockerfile-lint:
+  tools:
+    - hadolint
+  rules:
+    - Pin base image versions
+    - Use COPY over ADD
+    - Don't run as root
+    - Minimize layers
+  commands:
+    check: "hadolint Dockerfile"
+```
+
+---
+
+## Domain Keyword Mapping
+
+### Frontend (20+ keywords)
+
+```yaml
+frontend:
+  - react
+  - nextjs
+  - vue
+  - angular
+  - svelte
+  - css
+  - tailwind
+  - component
+  - ui
+  - ux
+  - accessibility
+  - a11y
+  - responsive
+  - animation
+  - state
+  - redux
+  - zustand
+  - form
+  - modal
+  - layout
+```
+
+### Backend (20+ keywords)
+
+```yaml
+backend:
+  - api
+  - rest
+  - graphql
+  - grpc
+  - server
+  - express
+  - nestjs
+  - fastify
+  - nodejs
+  - middleware
+  - route
+  - controller
+  - service
+  - validation
+  - authentication
+  - authorization
+  - session
+  - token
+  - webhook
+  - websocket
+```
+
+### Database (15+ keywords)
+
+```yaml
+database:
+  - database
+  - db
+  - sql
+  - nosql
+  - postgres
+  - postgresql
+  - mysql
+  - mongodb
+  - redis
+  - prisma
+  - drizzle
+  - schema
+  - migration
+  - query
+  - index
+  - orm
+```
+
+### DevOps (15+ keywords)
+
+```yaml
+devops:
+  - docker
+  - kubernetes
+  - k8s
+  - deploy
+  - ci
+  - cd
+  - pipeline
+  - github-actions
+  - terraform
+  - aws
+  - gcp
+  - azure
+  - cloudflare
+  - nginx
+  - compose
+```
+
+### Security (12+ keywords)
+
+```yaml
+security:
+  - auth
+  - authentication
+  - authorization
+  - oauth
+  - jwt
+  - security
+  - vulnerability
+  - secret
+  - permission
+  - role
+  - encrypt
+  - hash
+```
+
+### Testing (10+ keywords)
+
+```yaml
+testing:
+  - test
+  - jest
+  - vitest
+  - playwright
+  - cypress
+  - coverage
+  - mock
+  - stub
+  - e2e
+  - integration
+```
+
+---
+
+## Skill Loading Protocol
+
+1. **Extract keywords** from user request
+2. **Detect file types** from mentioned files or context
+3. **Match to skills** via keyword mapping
+4. **Load lint skill** for detected file types
+5. **Load domain skills** for matched keywords
+6. **Apply to context** for execution
+
+---
+
+## MCP Integration
+
+### Memory Usage
+
+```yaml
+mcp-memory:
+  store:
+    - Skill usage patterns
+    - User preferences
+    - Successful combinations
+  retrieve:
+    - Previous skill loads for similar requests
+    - Cached lint configurations
+```
+
+### Sequential Thinking
+
+```yaml
+mcp-sequentialthinking:
+  use_for:
+    - Complex skill dependency resolution
+    - Multi-domain skill combinations
+    - Conflict resolution between skills
+```
