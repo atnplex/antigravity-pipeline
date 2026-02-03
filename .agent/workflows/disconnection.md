@@ -71,29 +71,30 @@ When user reports a disconnection, error, or session interruption.
    Based on cause:
 
    ```yaml
-   if: token_limit
-   then:
-     - Enable context compression
-     - Summarize before long responses
-     - Use filesystem-context skill
+   prevention_measures:
+     - cause: token_limit
+       actions:
+         - Enable context compression
+         - Summarize before long responses
+         - Use filesystem-context skill
 
-   if: rate_limit
-   then:
-     - Distribute across accounts (15+ Google Pro)
-     - Add delays between calls
-     - Batch operations
+     - cause: rate_limit
+       actions:
+         - Distribute across available premium accounts
+         - Add delays between calls
+         - Batch operations
 
-   if: parsing_error
-   then:
-     - Simplify output format
-     - Avoid deeply nested structures
-     - Test output formatting
+     - cause: parsing_error
+       actions:
+         - Simplify output format
+         - Avoid deeply nested structures
+         - Test output formatting
 
-   if: timeout
-   then:
-     - Use background processes
-     - Checkpoint frequently
-     - Break into smaller steps
+     - cause: timeout
+       actions:
+         - Use background processes
+         - Checkpoint frequently
+         - Break into smaller steps
    ```
 
 7. **Resume Carefully**
