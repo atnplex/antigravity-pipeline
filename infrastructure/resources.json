@@ -1,0 +1,69 @@
+{
+  "version": "1.0.0",
+  "updated": "2026-02-03",
+  "accounts": {
+    "google_pro": {
+      "count": 15,
+      "services": ["gemini", "drive", "notebooklm", "colab"],
+      "rate_limits": "minimal - can parallelize heavily"
+    },
+    "perplexity_pro": {
+      "count": 5,
+      "services": ["search", "reasoning"],
+      "rate_limits": "can rotate accounts for parallel research"
+    },
+    "onedrive": {
+      "count": 2,
+      "storage_tb": 1,
+      "total_tb": 2,
+      "use_cases": ["backup", "artifact storage", "cross-device sync"]
+    }
+  },
+  "servers": {
+    "vps1": {
+      "type": "cloud",
+      "location": "primary",
+      "services": ["antigravity-manager", "mcp-servers"]
+    },
+    "vps2_condo": {
+      "type": "cloud",
+      "location": "secondary",
+      "services": ["antigravity-manager", "backup"]
+    },
+    "unraid": {
+      "type": "local",
+      "location": "home",
+      "services": ["storage", "docker", "media"]
+    }
+  },
+  "networks": {
+    "tailscale": {
+      "mesh": ["vps1", "vps2", "unraid"],
+      "status": "active"
+    },
+    "atn_bridge": {
+      "type": "docker",
+      "status": "active"
+    }
+  },
+  "mcp_servers": {
+    "available": [
+      "mcp-memory",
+      "mcp-filesystem",
+      "mcp-fetch",
+      "mcp-git",
+      "mcp-playwright",
+      "mcp-time",
+      "github-mcp-server",
+      "perplexity-ask",
+      "mcp-sequentialthinking"
+    ],
+    "planned": ["mcp-obsidian", "mcp-redis", "mcp-qdrant"]
+  },
+  "optimization_notes": {
+    "parallel_research": "Use multiple Perplexity accounts for parallel queries",
+    "model_distribution": "Distribute Gemini load across 15 accounts",
+    "storage": "OneDrive for persistent artifact backup",
+    "networking": "Tailscale mesh for secure cross-server comms"
+  }
+}
