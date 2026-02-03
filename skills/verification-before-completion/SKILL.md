@@ -6,11 +6,24 @@ keywords: [verify, test, complete, done, check, evidence, finish]
 
 # Verification Before Completion
 
-## Core Principle
+## When to Use
 
-> [!CAUTION]
-> Claiming work is complete without verification is dishonesty, not efficiency.
-> **Evidence before claims, always.**
+> [!IMPORTANT]
+> Use BEFORE any claim of completion AND during planning/execution phases.
+
+### During Planning
+- Verify environment (OS, shell, available commands)
+- Check paths exist before operating on them
+- Confirm dependencies are available
+
+### During Execution
+- Make commands idempotent (safe to run multiple times)
+- Implement error handling with fallbacks
+- Verify each step before proceeding
+
+### Before Completion
+- Run all verification commands fresh
+- Evidence before claims, always
 
 ## The Iron Law
 
