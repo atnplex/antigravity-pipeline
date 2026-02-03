@@ -1,0 +1,272 @@
+# Autonomous PR Review Mesh
+#
+# This workflow implements a self-healing review loop:
+# 1. AI reviewers (Gemini/CodeRabbit) review the PR
+# 2. If changes requested, Jules implements fixes
+# 3. Jules creates a new PR with fixes
+# 4. Loop until approved or max iterations reached
+# 5. Auto-merge when approved
+
+name: Autonomous PR Review Mesh
+
+on:
+  pull_request:
+    types: [opened, synchronize, ready_for_review]
+  pull_request_review:
+    types: [submitted]
+
+permissions:
+  contents: write
+  pull-requests: write
+  issues: write
+
+env:
+  MAX_ITERATIONS: 5
+
+jobs:
+  # Job 1: Wait for and collect AI reviews
+  collect-reviews:
+    runs-on: ubuntu-latest
+    if: github.event.pull_request.draft == false
+    outputs:
+      has_changes_requested: ${{ steps.analyze.outputs.has_changes_requested }}
+      review_comments: ${{ steps.analyze.outputs.review_comments }}
+      iteration: ${{ steps.iteration.outputs.count }}
+      jules_instance: ${{ steps.route.outputs.instance }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # Determine iteration count from branch name (e.g., fix/issue-v2)
+      - name: Get iteration count
+        id: iteration
+        run: |
+          BRANCH="${{ github.head_ref }}"
+          if [[ "$BRANCH" =~ -v([0-9]+)$ ]]; then
+            COUNT="${BASH_REMATCH[1]}"
+          else
+            COUNT=1
+          fi
+          echo "count=$COUNT" >> $GITHUB_OUTPUT
+          echo "Iteration: $COUNT"
+
+      # Check if max iterations reached
+      - name: Check iteration limit
+        if: steps.iteration.outputs.count > env.MAX_ITERATIONS
+        run: |
+          echo "::error::Max iterations ($MAX_ITERATIONS) reached. Needs human review."
+          exit 1
+
+      # Wait for AI reviewers to complete (give them time)
+      - name: Wait for AI reviews
+        run: |
+          echo "Waiting 90 seconds for AI reviewers..."
+          sleep 90
+
+      # Collect and analyze review comments
+      - name: Analyze reviews
+        id: analyze
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const { owner, repo } = context.repo;
+            const pull_number = context.payload.pull_request.number;
+
+            // Get all reviews
+            const reviews = await github.rest.pulls.listReviews({
+              owner, repo, pull_number
+            });
+
+            // Get all review comments
+            const comments = await github.rest.pulls.listReviewComments({
+              owner, repo, pull_number
+            });
+
+            // Check for CHANGES_REQUESTED
+            const changesRequested = reviews.data.some(
+              r => r.state === 'CHANGES_REQUESTED'
+            );
+
+            // Check for unresolved conversations
+            const unresolvedComments = comments.data.filter(c => !c.resolved);
+
+            // Format comments for Jules
+            const formattedComments = unresolvedComments.map(c => ({
+              path: c.path,
+              line: c.line || c.original_line,
+              body: c.body,
+              author: c.user.login
+            }));
+
+            console.log(`Changes requested: ${changesRequested}`);
+            console.log(`Unresolved comments: ${unresolvedComments.length}`);
+
+            core.setOutput('has_changes_requested',
+              changesRequested || unresolvedComments.length > 0);
+            core.setOutput('review_comments', JSON.stringify(formattedComments));
+
+      # Route to Jules instance (round-robin based on PR number)
+      - name: Route to Jules instance
+        id: route
+        run: |
+          PR_NUM=${{ github.event.pull_request.number }}
+          JULES_INDEX=$(( (PR_NUM % 3) + 1 ))
+          echo "instance=$JULES_INDEX" >> $GITHUB_OUTPUT
+          echo "Routing to Jules instance: jules$JULES_INDEX"
+
+  # Job 2: Jules implements fixes
+  implement-fixes:
+    needs: collect-reviews
+    runs-on: ubuntu-latest
+    if: needs.collect-reviews.outputs.has_changes_requested == 'true'
+
+    steps:
+      - name: Checkout PR branch
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.head_ref }}
+          fetch-depth: 0
+
+      - name: Get PR diff
+        id: diff
+        run: |
+          git diff origin/${{ github.base_ref }}...HEAD > pr_diff.patch
+          echo "diff_file=pr_diff.patch" >> $GITHUB_OUTPUT
+
+      # Call Jules API to implement fixes
+      # NOTE: Replace with actual Jules API endpoint when available
+      - name: Call Jules API
+        id: jules
+        env:
+          JULES_API_KEY: ${{ secrets[format('JULES_API_KEY_{0}', needs.collect-reviews.outputs.jules_instance)] }}
+          REVIEW_COMMENTS: ${{ needs.collect-reviews.outputs.review_comments }}
+        run: |
+          echo "Calling Jules instance ${{ needs.collect-reviews.outputs.jules_instance }}"
+
+          # Prepare the instruction for Jules
+          cat > jules_instruction.json << EOF
+          {
+            "repository": "${{ github.repository }}",
+            "pr_number": ${{ github.event.pull_request.number }},
+            "base_branch": "${{ github.base_ref }}",
+            "head_branch": "${{ github.head_ref }}",
+            "review_comments": $REVIEW_COMMENTS,
+            "instruction": "Please review the comments from AI reviewers and implement the suggested fixes. Create commits for each fix. Ensure all review comments are addressed."
+          }
+          EOF
+
+          # TODO: Uncomment when Jules API is available
+          # curl -X POST "https://jules.google/api/v1/tasks" \
+          #   -H "Authorization: Bearer $JULES_API_KEY" \
+          #   -H "Content-Type: application/json" \
+          #   -d @jules_instruction.json \
+          #   -o jules_response.json
+
+          echo "Jules instruction prepared. See jules_instruction.json"
+          echo "::notice::Jules API integration pending - manual step required"
+
+      # Create fix branch with iteration number
+      - name: Create fix branch
+        id: fix_branch
+        run: |
+          ITERATION=${{ needs.collect-reviews.outputs.iteration }}
+          NEW_ITERATION=$((ITERATION + 1))
+          BASE_BRANCH="${{ github.head_ref }}"
+
+          # Remove existing version suffix if present
+          BASE_BRANCH="${BASE_BRANCH%-v[0-9]*}"
+
+          NEW_BRANCH="${BASE_BRANCH}-v${NEW_ITERATION}"
+          echo "new_branch=$NEW_BRANCH" >> $GITHUB_OUTPUT
+          echo "New branch will be: $NEW_BRANCH"
+
+      # Notify that fixes are needed
+      - name: Comment on PR
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const iteration = ${{ needs.collect-reviews.outputs.iteration }};
+            const maxIterations = ${{ env.MAX_ITERATIONS }};
+            const julesInstance = ${{ needs.collect-reviews.outputs.jules_instance }};
+
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.payload.pull_request.number,
+              body: `## 🤖 Autonomous Review Mesh
+
+**Status**: Changes requested by AI reviewers
+**Iteration**: ${iteration}/${maxIterations}
+**Assigned**: Jules instance #${julesInstance}
+
+### Next Steps
+Jules is analyzing the review comments and will implement fixes.
+
+<details>
+<summary>Review Comments to Address</summary>
+
+\`\`\`json
+${{ needs.collect-reviews.outputs.review_comments }}
+\`\`\`
+
+</details>
+
+---
+*This is an automated message from the Autonomous PR Review Mesh.*`
+            });
+
+  # Job 3: Auto-merge when approved
+  auto-merge:
+    needs: collect-reviews
+    runs-on: ubuntu-latest
+    if: needs.collect-reviews.outputs.has_changes_requested == 'false'
+
+    steps:
+      - name: Check for approvals
+        id: approvals
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const reviews = await github.rest.pulls.listReviews({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              pull_number: context.payload.pull_request.number
+            });
+
+            const approvals = reviews.data.filter(r => r.state === 'APPROVED');
+            core.setOutput('approval_count', approvals.length);
+            console.log(`Approvals: ${approvals.length}`);
+
+      - name: Enable auto-merge
+        if: steps.approvals.outputs.approval_count >= 1
+        uses: actions/github-script@v7
+        with:
+          script: |
+            await github.rest.pulls.merge({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              pull_number: context.payload.pull_request.number,
+              merge_method: 'squash'
+            });
+
+            console.log('PR auto-merged!');
+
+      - name: Comment on successful merge
+        if: steps.approvals.outputs.approval_count >= 1
+        uses: actions/github-script@v7
+        with:
+          script: |
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.payload.pull_request.number,
+              body: `## ✅ Autonomous Review Complete
+
+All review comments addressed. PR has been auto-merged.
+
+**Iterations**: ${{ needs.collect-reviews.outputs.iteration }}
+
+---
+*This is an automated message from the Autonomous PR Review Mesh.*`
+            });

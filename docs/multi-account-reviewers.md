@@ -6,64 +6,56 @@ This document explains how to set up multiple AI reviewer accounts for round-rob
 
 With multiple Google Pro accounts, you can set up parallel Jules instances for increased throughput and redundancy.
 
+## Architecture: Autonomous PR Review Mesh
+
+```
+
+                  AUTONOMOUS PR REVIEW LOOP                      │
+
+  1. PR Opened                                                   │
+  2. Gemini/CodeRabbit review → suggest changes                  │
+  3. GitHub Action detects "changes requested"                   │
+  4. Routes to Jules instance (round-robin)                      │
+  5. Jules implements fixes → creates new PR                     │
+  6. Old PR closed → new PR reviewed                             │
+  7. REPEAT until approved (max 5 iterations)                    │
+  8. Auto-merge on approval                                      │
+
+```
+
 ## Multi-Jules Setup
 
-### Option 1: GitHub App per Account (Recommended)
+### Step-by-Step Setup
 
-Each Google account can have its own Jules installation:
+1. **Create Chrome Profile for each Google account**
+   ```
+   Profile 1 → logs into Google Account A → jules1
+   Profile 2 → logs into Google Account B → jules2
+   Profile 3 → logs into Google Account C → jules3
+   ```
 
-1. **jules1** - Primary Jules (your main Google account)
-   - Install: <https://jules.google> → Connect GitHub
-   - Label trigger: `jules` or `jules1`
+2. **Open jules.google in each profile**
+   - Connect GitHub repository
+   - Get API key (if available) from settings
 
-2. **jules2** - Secondary Jules (second Google account)
-   - Install from second Google account
-   - Label trigger: `jules2`
+3. **Store API keys in GitHub Secrets**
+   ```
+   Settings → Secrets and variables → Actions
+   
+   JULES_API_KEY_1 → API key from Account A
+   JULES_API_KEY_2 → API key from Account B
+   JULES_API_KEY_3 → API key from Account C
+   ```
 
-3. **jules3** - Tertiary Jules (third Google account)
-   - Install from third Google account
-   - Label trigger: `jules3`
+### Round-Robin Assignment
 
-### How It Works
-
-```
-Issue created → Add label "jules1" → Jules1 picks up
-                Add label "jules2" → Jules2 picks up (different account)
-```
-
-### Round-Robin Pattern
-
-Create a GitHub Action that rotates between Jules accounts:
-
-```yaml
-# .github/workflows/jules-round-robin.yml
-name: Jules Round Robin
-
-on:
-  issues:
-    types: [opened, labeled]
-
-jobs:
-  assign-jules:
-    runs-on: ubuntu-latest
-    if: contains(github.event.issue.labels.*.name, 'needs-agent')
-    steps:
-      - name: Assign Jules in rotation
-        uses: actions/github-script@v7
-        with:
-          script: |
-            // Get issue number modulo 3 for round-robin
-            const julesNumber = (context.issue.number % 3) + 1;
-            const julesLabel = `jules${julesNumber}`;
-
-            await github.rest.issues.addLabels({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              issue_number: context.issue.number,
-              labels: [julesLabel]
-            });
-
-            console.log(`Assigned to ${julesLabel}`);
+```javascript
+// PR number determines which Jules handles
+const julesInstance = (prNumber % 3) + 1;
+// PR #1 → jules1
+// PR #2 → jules2
+// PR #3 → jules3
+// PR #4 → jules1 (cycle repeats)
 ```
 
 ## Rate Limits Summary
@@ -74,6 +66,25 @@ jobs:
 | **CodeRabbit Free** | 2 reviews/hour | Summary + inline comments |
 | **Jules Google** | Per-account limits | Use multiple accounts |
 | **Copilot Pro** | 300 premium/month | Save for security/complex |
+
+## The Self-Healing Loop
+
+```
+PR v1 → Review → Changes Requested → Jules Fixes → PR v2
+PR v2 → Review → Changes Requested → Jules Fixes → PR v3
+PR v3 → Review → Approved! → Auto-merge ✅
+```
+
+### Iteration Tracking
+
+Branch naming convention tracks iterations:
+```
+feat/add-auth           → Iteration 1
+feat/add-auth-v2        → Iteration 2
+feat/add-auth-v3        → Iteration 3
+```
+
+Maximum: 5 iterations before requiring human review.
 
 ## Cascade Pattern
 
@@ -92,44 +103,23 @@ To prevent accidental Copilot usage:
 
 1. **Do NOT add Copilot as auto-reviewer**
 2. Only request Copilot when `copilot-review` label is added
-3. Track monthly usage in infrastructure/resources.json
-
-```yaml
-# In branch protection rules:
-# Required reviewers: gemini-code-assist[bot]
-# Optional: copilot-review (only when labeled)
-```
+3. Track monthly usage
 
 ## Perplexity in Review Process
 
 Perplexity can assist with:
-
 - Research during review (API calls)
 - Documentation verification
 - External reference checking
 
-Integration via GitHub Action:
+## Setup Checklist
 
-```yaml
-- name: Research with Perplexity
-  if: contains(github.event.issue.labels.*.name, 'needs-research')
-  run: |
-    # Call Perplexity API for research
-    # Add findings as comment
-```
-
-## Recommended Setup
-
-1. **Gemini Code Assist**: Required status check (free, always on)
-2. **CodeRabbit**: Install from Marketplace (free for OSS)
-3. **Jules1-3**: Install from different Google accounts
-4. **Copilot**: Only via explicit `copilot-review` label
-
-## Disable Merge Queue (Optional)
-
-For solo developer + bots:
-
-1. Go to Repository Settings → Rules → Branch protection
-2. Remove "Require merge queue" requirement
-3. Keep "Require conversations resolved"
-4. Keep "Require 1 approval" (from AI reviewer)
+- [ ] Install Gemini Code Assist GitHub App
+- [ ] Install CodeRabbit from GitHub Marketplace
+- [ ] Create 3 Chrome profiles for Jules
+- [ ] Install Jules from each Google account
+- [ ] Get Jules API keys (if available)
+- [ ] Add API keys to GitHub Secrets
+- [ ] Set Gemini as required status check
+- [ ] Remove merge queue (optional for solo)
+- [ ] Keep conversations resolved requirement
