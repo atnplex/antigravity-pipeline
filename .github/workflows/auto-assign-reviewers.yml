@@ -1,0 +1,61 @@
+# Auto-assign AI reviewers to PRs
+# Uses round-robin pattern for multiple reviewers
+
+name: Auto-Assign Reviewers
+
+on:
+  pull_request:
+    types: [opened, ready_for_review]
+
+permissions:
+  pull-requests: write
+
+jobs:
+  assign-reviewers:
+    runs-on: ubuntu-latest
+    # Skip draft PRs and bot PRs
+    if: github.event.pull_request.draft == false && github.actor != 'dependabot[bot]'
+
+    steps:
+      - name: Auto-assign reviewers
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const pr = context.payload.pull_request;
+
+            // Define reviewer rotation
+            // NOTE: Add your AI reviewer bot usernames here
+            // These are GitHub App/bot accounts that will review
+            const aiReviewers = [
+              // Gemini Code Assist is auto-triggered via GitHub App
+              // CodeRabbit is auto-triggered via GitHub App
+              // Add other bot accounts if available
+            ];
+
+            // For human fallback (optional)
+            const humanReviewers = [];
+
+            // Determine review type based on labels or file changes
+            const labels = pr.labels.map(l => l.name);
+            const needsSecurityReview = labels.includes('security');
+            const needsHumanReview = labels.includes('needs-human-review');
+
+            // Log for debugging
+            console.log(`PR #${pr.number}: ${pr.title}`);
+            console.log(`Labels: ${labels.join(', ')}`);
+
+            // Add labels for AI reviewers to pick up
+            if (!labels.includes('ai-review-requested')) {
+              await github.rest.issues.addLabels({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: pr.number,
+                labels: ['ai-review-requested']
+              });
+            }
+
+            // If security, add security label for Copilot/human
+            if (needsSecurityReview) {
+              console.log('Security review requested - consider using Copilot');
+            }

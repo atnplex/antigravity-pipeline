@@ -1,0 +1,347 @@
+# Autonomous PR Review Mesh
+#
+# Self-healing review loop using multiple AI reviewers:
+# 1. Gemini/CodeRabbit auto-review PRs (free)
+# 2. If changes requested, Jules implements fixes
+# 3. Jules creates new PR with fixes automatically
+# 4. Loop until approved or max iterations reached
+# 5. Auto-merge when approved
+#
+# Secrets required (stored in Bitwarden Secrets Manager):
+# - BW_ACCESS_TOKEN: Bitwarden machine account token
+# - Jules API keys retrieved from Bitwarden at runtime
+
+name: Autonomous PR Review Mesh
+
+on:
+  pull_request:
+    types: [opened, synchronize, ready_for_review]
+  pull_request_review:
+    types: [submitted]
+  workflow_dispatch:
+    inputs:
+      pr_number:
+        description: 'PR number to process'
+        required: true
+        type: number
+
+permissions:
+  contents: write
+  pull-requests: write
+  issues: write
+
+env:
+  MAX_ITERATIONS: 5
+  JULES_API_BASE: https://jules.googleapis.com/v1alpha
+
+jobs:
+  # Job 1: Retrieve secrets from Bitwarden
+  get-secrets:
+    runs-on: ubuntu-latest
+    outputs:
+      jules_key_1: ${{ steps.secrets.outputs.JULES_API_KEY_01 }}
+      jules_key_2: ${{ steps.secrets.outputs.JULES_API_KEY_02 }}
+      jules_key_3: ${{ steps.secrets.outputs.JULES_API_KEY_03 }}
+    steps:
+      - name: Get secrets from Bitwarden
+        id: secrets
+        uses: bitwarden/sm-action@v2
+        with:
+          access_token: ${{ secrets.BW_ACCESS_TOKEN }}
+          # Replace these UUIDs with your actual Bitwarden secret IDs
+          secrets: |
+            JULES_API_KEY_01_UUID > JULES_API_KEY_01
+            JULES_API_KEY_02_UUID > JULES_API_KEY_02
+            JULES_API_KEY_03_UUID > JULES_API_KEY_03
+
+  # Job 2: Collect and analyze AI reviews
+  collect-reviews:
+    runs-on: ubuntu-latest
+    needs: get-secrets
+    if: github.event.pull_request.draft == false
+    outputs:
+      has_changes_requested: ${{ steps.analyze.outputs.has_changes_requested }}
+      review_comments: ${{ steps.analyze.outputs.review_comments }}
+      iteration: ${{ steps.iteration.outputs.count }}
+      jules_instance: ${{ steps.route.outputs.instance }}
+      jules_api_key: ${{ steps.route.outputs.api_key }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # Determine iteration count from branch name
+      - name: Get iteration count
+        id: iteration
+        run: |
+          BRANCH="${{ github.head_ref }}"
+          if [[ "$BRANCH" =~ -v([0-9]+)$ ]]; then
+            COUNT="${BASH_REMATCH[1]}"
+          else
+            COUNT=1
+          fi
+          echo "count=$COUNT" >> $GITHUB_OUTPUT
+          echo "📊 Iteration: $COUNT"
+
+      # Check if max iterations reached
+      - name: Check iteration limit
+        if: steps.iteration.outputs.count > env.MAX_ITERATIONS
+        run: |
+          echo "::error::Max iterations ($MAX_ITERATIONS) reached. Needs human review."
+          gh pr comment ${{ github.event.pull_request.number }} \
+            --body "⚠️ **Max Iterations Reached**\n\nThis PR has gone through $MAX_ITERATIONS review cycles without resolution. Human review required."
+          exit 1
+        env:
+          GH_TOKEN: ${{ github.token }}
+
+      # Wait for AI reviewers to complete
+      - name: Wait for AI reviews
+        run: |
+          echo "⏳ Waiting 60 seconds for AI reviewers..."
+          sleep 60
+
+      # Analyze review comments
+      - name: Analyze reviews
+        id: analyze
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const { owner, repo } = context.repo;
+            const pull_number = context.payload.pull_request?.number ||
+                               context.payload.inputs?.pr_number;
+
+            if (!pull_number) {
+              core.setFailed('No PR number found');
+              return;
+            }
+
+            // Get all reviews
+            const reviews = await github.rest.pulls.listReviews({
+              owner, repo, pull_number
+            });
+
+            // Get all review comments
+            const comments = await github.rest.pulls.listReviewComments({
+              owner, repo, pull_number
+            });
+
+            // Check for CHANGES_REQUESTED
+            const changesRequested = reviews.data.some(
+              r => r.state === 'CHANGES_REQUESTED'
+            );
+
+            // Get unresolved comments
+            const unresolvedComments = comments.data.filter(c => {
+              // Comments without in_reply_to_id are top-level
+              return !c.in_reply_to_id;
+            });
+
+            // Format for Jules
+            const formattedComments = unresolvedComments.map(c => ({
+              path: c.path,
+              line: c.line || c.original_line,
+              body: c.body,
+              author: c.user.login,
+              diff_hunk: c.diff_hunk
+            }));
+
+            const hasIssues = changesRequested || formattedComments.length > 0;
+
+            console.log(`Changes requested: ${changesRequested}`);
+            console.log(`Unresolved comments: ${formattedComments.length}`);
+
+            core.setOutput('has_changes_requested', hasIssues);
+            core.setOutput('review_comments', JSON.stringify(formattedComments));
+
+      # Route to Jules instance (round-robin)
+      - name: Route to Jules instance
+        id: route
+        run: |
+          PR_NUM=${{ github.event.pull_request.number }}
+          JULES_INDEX=$(( (PR_NUM % 3) + 1 ))
+          echo "instance=$JULES_INDEX" >> $GITHUB_OUTPUT
+          echo "🎯 Routing to Jules instance: jules$JULES_INDEX"
+
+          # Select the appropriate API key
+          case $JULES_INDEX in
+            1) echo "api_key=${{ needs.get-secrets.outputs.jules_key_1 }}" >> $GITHUB_OUTPUT ;;
+            2) echo "api_key=${{ needs.get-secrets.outputs.jules_key_2 }}" >> $GITHUB_OUTPUT ;;
+            3) echo "api_key=${{ needs.get-secrets.outputs.jules_key_3 }}" >> $GITHUB_OUTPUT ;;
+          esac
+
+  # Job 3: Jules implements fixes
+  implement-fixes:
+    needs: [get-secrets, collect-reviews]
+    runs-on: ubuntu-latest
+    if: needs.collect-reviews.outputs.has_changes_requested == 'true'
+
+    steps:
+      - name: Checkout PR branch
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.head_ref }}
+          fetch-depth: 0
+
+      # Get PR diff for context
+      - name: Get PR diff
+        id: diff
+        run: |
+          git diff origin/${{ github.base_ref }}...HEAD > pr_diff.patch
+          echo "Generated diff file"
+
+      # Build Jules instruction from review comments
+      - name: Build Jules instruction
+        id: instruction
+        run: |
+          COMMENTS='${{ needs.collect-reviews.outputs.review_comments }}'
+
+          # Create detailed instruction for Jules
+          cat > jules_instruction.txt << 'INSTRUCTION'
+          Please address the following review comments on this pull request:
+
+          $COMMENTS
+
+          For each comment:
+          1. Understand the reviewer's concern
+          2. Implement the suggested fix
+          3. Ensure the fix doesn't break existing functionality
+
+          After making all fixes, create a new pull request with the changes.
+          INSTRUCTION
+
+          echo "instruction_file=jules_instruction.txt" >> $GITHUB_OUTPUT
+
+      # Call Jules API to implement fixes
+      - name: Call Jules API
+        id: jules
+        env:
+          JULES_API_KEY: ${{ needs.collect-reviews.outputs.jules_api_key }}
+          REVIEW_COMMENTS: ${{ needs.collect-reviews.outputs.review_comments }}
+        run: |
+          echo "🤖 Calling Jules instance ${{ needs.collect-reviews.outputs.jules_instance }}"
+
+          # Create session with Jules
+          RESPONSE=$(curl -s -X POST "${{ env.JULES_API_BASE }}/sessions" \
+            -H "Content-Type: application/json" \
+            -H "X-Goog-Api-Key: $JULES_API_KEY" \
+            -d '{
+              "prompt": "Address the following review comments and implement fixes:\n\n'"$(echo $REVIEW_COMMENTS | jq -r '.[] | "File: \(.path)\nLine: \(.line)\nComment: \(.body)\n---"')"'",
+              "sourceContext": {
+                "source": "sources/github/${{ github.repository }}",
+                "githubRepoContext": {
+                  "startingBranch": "${{ github.head_ref }}"
+                }
+              },
+              "automationMode": "AUTO_CREATE_PR",
+              "title": "Fix review comments from PR #${{ github.event.pull_request.number }}"
+            }')
+
+          echo "Jules response: $RESPONSE"
+
+          # Extract session ID
+          SESSION_ID=$(echo $RESPONSE | jq -r '.id // empty')
+          if [ -n "$SESSION_ID" ]; then
+            echo "session_id=$SESSION_ID" >> $GITHUB_OUTPUT
+            echo "✅ Jules session created: $SESSION_ID"
+          else
+            echo "::warning::Jules session creation may have failed"
+            echo "$RESPONSE"
+          fi
+
+      # Comment on PR with status
+      - name: Comment on PR
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const iteration = ${{ needs.collect-reviews.outputs.iteration }};
+            const maxIterations = ${{ env.MAX_ITERATIONS }};
+            const julesInstance = ${{ needs.collect-reviews.outputs.jules_instance }};
+            const sessionId = '${{ steps.jules.outputs.session_id }}' || 'pending';
+
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.payload.pull_request.number,
+              body: `## 🤖 Autonomous Review Mesh
+
+**Status**: Changes requested → Jules implementing fixes
+**Iteration**: ${iteration}/${maxIterations}
+**Jules Instance**: #${julesInstance}
+**Session ID**: \`${sessionId}\`
+
+### What's Happening
+1. ✅ AI reviewers analyzed this PR
+2. ✅ Found issues that need fixing
+3. 🔄 Jules is implementing the fixes
+4. ⏳ A new PR will be created with the fixes
+
+### Review Comments Being Addressed
+<details>
+<summary>Click to expand</summary>
+
+\`\`\`json
+${{ needs.collect-reviews.outputs.review_comments }}
+\`\`\`
+
+</details>
+
+---
+*Powered by Autonomous PR Review Mesh • [Jules API](https://developers.google.com/jules/api)*`
+            });
+
+  # Job 4: Auto-merge when approved
+  auto-merge:
+    needs: collect-reviews
+    runs-on: ubuntu-latest
+    if: needs.collect-reviews.outputs.has_changes_requested == 'false'
+
+    steps:
+      - name: Check for approvals
+        id: approvals
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const reviews = await github.rest.pulls.listReviews({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              pull_number: context.payload.pull_request.number
+            });
+
+            const approvals = reviews.data.filter(r => r.state === 'APPROVED');
+            const hasApproval = approvals.length >= 1;
+
+            core.setOutput('approval_count', approvals.length);
+            core.setOutput('has_approval', hasApproval);
+            console.log(`✅ Approvals: ${approvals.length}`);
+
+      - name: Enable auto-merge
+        if: steps.approvals.outputs.has_approval == 'true'
+        run: |
+          gh pr merge ${{ github.event.pull_request.number }} \
+            --auto --squash \
+            --subject "Merge PR #${{ github.event.pull_request.number }}"
+        env:
+          GH_TOKEN: ${{ github.token }}
+
+      - name: Comment on successful review
+        if: steps.approvals.outputs.has_approval == 'true'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const iteration = ${{ needs.collect-reviews.outputs.iteration }};
+
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.payload.pull_request.number,
+              body: `## ✅ Autonomous Review Complete
+
+All review comments have been addressed!
+
+**Final Status**: Approved for merge
+**Total Iterations**: ${iteration}
+**Approvals**: ${{ steps.approvals.outputs.approval_count }}
+
+---
+*Powered by Autonomous PR Review Mesh*`
+            });

@@ -1,0 +1,20 @@
+# CODEOWNERS - Auto-assign reviewers by file path
+# GitHub will automatically request reviews from these owners
+
+# Default owners for everything
+* @atnplex/ai-reviewers
+
+# Skills require AI review
+/skills/ @atnplex/ai-reviewers
+
+# Workflows require careful review
+/.github/workflows/ @atnplex/ai-reviewers
+
+# Pipeline definitions
+/global_workflows/ @atnplex/ai-reviewers
+
+# Infrastructure changes
+/infrastructure/ @atnplex/ai-reviewers
+
+# Security-sensitive files - consider human review
+# /.github/workflows/deploy*.yml @human-reviewer

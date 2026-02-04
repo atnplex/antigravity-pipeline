@@ -1,0 +1,56 @@
+# Jules Instance Configuration
+#
+# This file documents the multi-Jules setup for round-robin PR reviews.
+# Each Jules instance is tied to a separate Google account.
+
+# Required GitHub Secrets:
+# - JULES_API_KEY_1: API key from Google Account #1
+# - JULES_API_KEY_2: API key from Google Account #2
+# - JULES_API_KEY_3: API key from Google Account #3
+
+instances:
+  jules1:
+    description: "Primary Jules instance"
+    google_account: "Account #1"
+    trigger_labels:
+      - jules
+      - jules1
+    assigned_by: "PR number % 3 == 1"
+
+  jules2:
+    description: "Secondary Jules instance"
+    google_account: "Account #2"
+    trigger_labels:
+      - jules2
+    assigned_by: "PR number % 3 == 2"
+
+  jules3:
+    description: "Tertiary Jules instance"
+    google_account: "Account #3"
+    trigger_labels:
+      - jules3
+    assigned_by: "PR number % 3 == 0"
+
+routing:
+  strategy: round_robin
+  formula: "(PR_NUMBER % 3) + 1"
+  fallback: jules1
+
+settings:
+  max_iterations: 5
+  wait_for_reviews_seconds: 90
+  auto_merge_on_approval: true
+  min_approvals_for_merge: 1
+
+# Setup Instructions:
+#
+# 1. Create 3 Chrome profiles, each logged into a different Google account
+# 2. In each profile, go to https://jules.google
+# 3. Connect GitHub repository
+# 4. Get API key from Jules settings (if available)
+# 5. Add API keys to GitHub Secrets:
+#    - Settings → Secrets and variables → Actions
+#    - Add: JULES_API_KEY_1, JULES_API_KEY_2, JULES_API_KEY_3
+#
+# Note: If Jules doesn't have a public API yet, the workflow will
+# notify you to manually trigger Jules from the browser.
