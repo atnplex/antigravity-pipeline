@@ -1,175 +1,151 @@
 # Antigravity Global Rules
 
-> **Version**: 2.0.0
-> **Updated**: 2026-02-02
+> **Version**: 3.1.0
+> **Updated**: 2026-02-11
+> **Namespace**: `/atn`
 
 ---
 
-## Pipeline Enforcement
+## R0: Precedence
+
+**Global Rules prevail.** This file is the entry point for all Antigravity operations.
+
+| Path                                         | Purpose                  |
+| -------------------------------------------- | ------------------------ |
+| `/atn/.gemini/GEMINI.md`                     | This file (global rules) |
+| `/atn/.agent/rules/`                         | Detailed rule modules    |
+| `/atn/.gemini/antigravity/global_workflows/` | Global workflows         |
+| `/atn/.gemini/antigravity/skills/`           | Skills                   |
+| `/atn/baseline/`                             | Namespace baseline       |
+
+---
+
+## R00: Mandatory First Action
 
 > [!CAUTION]
-> ALL user input MUST be processed through the triage pipeline. No exceptions.
+> ABSOLUTE FIRST STEP FOR EVERY NEW USER REQUEST
 
-### Mandatory Processing
+1. **Slash command detected** → Execute that workflow directly
+2. **Continuing existing thread** → Resume with context (no re-triage)
+3. **Trivial question** → Answer directly
+4. **All other new requests** → Execute `/triage` workflow
 
-1. Every new request → `pipeline/00-triage.md`
-2. No direct execution without triage classification
-3. Complex tasks require decomposition before execution
-4. Security-sensitive requests get elevated review
-
-### Triage Gate
-
-Before ANY action on user request:
-
-```
-1. Classify intent (direct vs needs clarification)
-2. Assess complexity (simple → direct, complex → decompose)
-3. Detect domain (frontend/backend/devops/security/etc.)
-4. Evaluate risk (breaking changes, security implications)
-5. Present options to user
-```
+Pipeline: `Triage (00) → Confirmation (01) → Decomposition (02) → Execute (03) → PR/Deliver (04-05)`
 
 ---
 
-## Model Tiering
+## Core Principles
 
-> Distribute load across providers to manage rate limits and costs.
-
-| Phase | Model | Rationale |
-|-------|-------|-----------|
-| **Triage** | Opus 4.5 Thinking | High-stakes initial evaluation |
-| **Decomposition** | Opus 4.5 Thinking | Complex planning requires deep reasoning |
-| **Simple Execution** | Gemini 3 Pro Flash | Fast, efficient for simple tasks |
-| **Standard Execution** | Sonnet 4.5 OR Gemini 3 Pro | Balanced quality/speed, load distribution |
-| **Complex Execution** | Opus 4.5 | Architecture, refactoring |
-| **Security Review** | Opus 4.5 | Critical path, no shortcuts |
-| **PR Review** | Opus 4.5 | Must catch all issues |
-| **Documentation** | Gemini Flash | Fast, adequate quality |
-
-### Load Distribution Strategy
-
-```
-For Standard Execution tasks, alternate between:
-- Claude Sonnet 4.5: Complex logic, nuanced code
-- Gemini 3 Pro: Fast iteration, straightforward changes
-- Gemini 3 Pro High: Quality-sensitive but routine work
-- Gemini 3 Pro Low: High-volume, simple edits
-
-Selection criteria:
-- Task complexity → higher model tier
-- Rate limits approaching → switch provider
-- Batch operations → lower tier for speed
-```
+1. **Env-First**: Detect system/target before acting
+2. **No Hardcoding**: Use variables and configs (`$NAMESPACE=atn`)
+3. **Canonical**: UTC (ISO8601Z), smallest units (bytes, ms)
+4. **Python-Spine**: Complex logic in Python
+5. **Stability**: Enforce stable workspace modes
 
 ---
 
-## Skill Loading
+## Infrastructure Workflows
 
-### Sources
+> [!IMPORTANT]
+> For infrastructure work, **ALWAYS run `/inventory` first** to discover all available resources.
 
-Skills loaded from multiple sources (priority order):
+| Workflow          | Purpose                                                            |
+| ----------------- | ------------------------------------------------------------------ |
+| `/inventory`      | Discover ALL Tailscale machines and services (running AND stopped) |
+| `/deploy-service` | Deploy Docker services to VPS1, VPS2, or Unraid                    |
+| `/health-check`   | Check service health endpoints                                     |
 
-1. `~/.gemini/antigravity/skills/` - Local context engineering skills
-2. `~/skills/manifest.yaml` - Indexes remote skills:
-   - `sickn33/antigravity-awesome-skills` - 100+ skills
-   - `guanyang/antigravity-skills` - 50+ skills
-3. `/atn/baseline` - Local rules and workflows
-
-### Context Engineering Skills (Always Available)
-
-| Skill | Purpose |
-|-------|---------|
-| `context-compression` | Reduce token usage via summarization |
-| `context-optimization` | Position important info for attention |
-| `filesystem-context` | Offload context to files |
-
-### Loading Protocol
-
-1. Extract keywords from user request
-2. **Detect file types** → load relevant linting skills
-3. Match to domain skills via manifest keyword mapping
-4. Load SKILL.md from matched skill
-5. Apply knowledge to agent context
-6. Make scripts available (not auto-executed)
+**Compute Priority**: VPS1/VPS2 → Windows → Unraid (preserve Unraid for media)
 
 ---
 
-## Persona Assignment
+## Rule Modules
 
-Load persona from `global_workflows/personas/` based on task domain:
+Follow all rules in these directories:
 
-| Domain | Persona | Model |
-|--------|---------|-------|
-| Coordination | `orchestrator.md` | Opus Thinking |
-| System Design | `architect.md` | Opus 4.5 |
-| UI/React | `frontend-dev.md` | Sonnet 4.5 |
-| API/Server | `backend-dev.md` | Sonnet 4.5 |
-| Database | `database-engineer.md` | Sonnet 4.5 |
-| Deployment | `devops-engineer.md` | Sonnet 4.5 |
-| Security | `security-auditor.md` | Opus 4.5 |
-| Testing | `test-engineer.md` | Sonnet 4.5 |
-| Documentation | `docs-writer.md` | Flash |
-| Review | `code-reviewer.md` | Opus 4.5 |
-| Performance | `performance-engineer.md` | Sonnet 4.5 |
-| Design | `ux-designer.md` | Sonnet 4.5 |
+### Format Rules
+
+@/atn/.agent/rules/format-\*.md
+
+### Security Rules
+
+@/atn/.agent/rules/security-\*.md
+
+### Operational Rules
+
+@/atn/.agent/rules/operational-\*.md
+
+### Baseline Rules
+
+@/atn/baseline/rules/\*.md
 
 ---
 
-## Git Workflow (per /atn/baseline)
+## Quick Reference
 
-### Worktree Isolation (R22)
+### Formatting Standards
 
-All branch work in isolated worktrees:
+| Type     | Standard                                      |
+| -------- | --------------------------------------------- |
+| Markdown | Code blocks with language, single `#` per doc |
+| JSON     | 2-space indent, snake_case, `jq .` validation |
+| Shell    | `set -euo pipefail`, shellcheck, shfmt        |
+| Python   | PEP 8, type hints, `pathlib.Path`, Ruff/Black |
+| YAML     | 2-space, snake_case, yamllint                 |
 
-```
-$ROOT/worktrees/<type>/<slug>
-```
+### Git Workflow
 
-### Branch Naming
+- Branch naming: `<type>/<slug>` (feat/, fix/, refactor/)
+- Worktree isolation: `$ROOT/worktrees/<type>/<slug>`
+- Never merge manually - only via `gh pr merge`
+- All CI checks must pass before merge
 
-```
-<type>/<slug>
-Examples:
-  feat/add-auth-middleware
-  fix/broken-api-endpoint
-  refactor/database-schema
-```
+### Model Tiering (via AG Proxy)
 
-### PR Lifecycle (R25)
+> GUI default: `gemini-3-flash` — pipeline decides escalation.
 
-1. **Never merge manually** - only via `gh pr merge`
-2. **Security-first** - scan for secrets before any action
-3. **Wait for CI** - all checks must pass
-4. **Address ALL comments** - no dismissing, no bypassing
-5. **Branch auto-delete** - on merge via GitHub setting
-6. **Task not complete** - until branch is deleted
+| Phase                 | Model                     | Proxy ID                                 |
+| --------------------- | ------------------------- | ---------------------------------------- |
+| GUI Entry/Triage      | Gemini 3 Flash            | `gemini-3-flash`                         |
+| Simple Execution      | Gemini 2.5 Flash          | `gemini-2.5-flash`                       |
+| Standard Execution    | Sonnet 4.5 / Gemini 3 Pro | `claude-sonnet-4-5` / `gemini-3-pro-low` |
+| Complex Reasoning     | Gemini 3 Pro High         | `gemini-3-pro-high`                      |
+| Architecture/Security | Opus 4.6 Thinking         | `claude-opus-4-6-thinking`               |
+| Image Generation      | Gemini 3 Pro Image        | `gemini-3-pro-image`                     |
 
 ---
 
 ## Guardrails
 
 > [!WARNING]
-> These rules are non-negotiable.
+> Non-negotiable rules.
 
 1. No direct pushes to main/master
 2. No bypassing CI checks
-3. No manual branch deletion (auto-delete on merge)
-4. No skipping security review for auth/permissions code
-5. No force-merge with failing checks
-6. No dismissing review comments without addressing
+3. No skipping security review for auth/permissions code
+4. No dismissing review comments without addressing
+5. **No bare `run_command` without `timeout`** — EVERY command MUST be wrapped in `timeout <s>` (see `operational-cli-timeout.md`)
 
 ---
 
-## Workflow Locations
+## Directory Layout
 
-```
-~/.gemini/antigravity/global_workflows/
-├── pipeline/          # Core 6-phase pipeline
-├── personas/          # 12 specialist personas
-└── operations/        # Operational workflows
-
-~/skills/              # Skill sources
-├── manifest.yaml      # Index and keyword mapping
-├── cache/             # Remote skills cache
-└── local/             # Custom local skills
+```text
+/atn/
+├── .gemini/
+│   ├── GEMINI.md                # This file (global rules entry point)
+│   └── antigravity/
+│       ├── global_workflows/    # Workflows (invoked via /)
+│       ├── skills/              # Skills
+│       ├── personas/            # Persona definitions
+│       └── mcp_config.json      # MCP configuration
+└── .agent/
+    ├── rules/                   # All rule modules (flat structure)
+    │   ├── format-*.md          # Format rules
+    │   ├── security-*.md        # Security rules
+    │   └── operational-*.md     # Operational rules
+    └── learning/                # Self-improvement logs
+        ├── reflections/
+        ├── patterns.md
+        └── changelog.md
 ```

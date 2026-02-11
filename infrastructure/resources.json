@@ -1,11 +1,13 @@
 {
-  "version": "1.0.0",
-  "updated": "2026-02-03",
+  "version": "1.1.0",
+  "updated": "2026-02-11",
   "accounts": {
     "google_pro": {
       "count": 15,
       "services": ["gemini", "drive", "notebooklm", "colab"],
-      "rate_limits": "minimal - can parallelize heavily"
+      "rate_limits": "minimal - can parallelize heavily",
+      "image_gen": "~100 images/day per account via Gemini 3 Pro",
+      "video_gen": "Veo 3.1 — 8s clips at 720p/1080p"
     },
     "perplexity_pro": {
       "count": 5,
@@ -17,7 +19,29 @@
       "storage_tb": 1,
       "total_tb": 2,
       "use_cases": ["backup", "artifact storage", "cross-device sync"]
+    },
+    "google_drive": {
+      "storage_tb": 2,
+      "use_cases": ["media storage", "generated assets", "branding mockups"]
     }
+  },
+  "ag_proxy": {
+    "endpoint": "100.102.55.88:9045",
+    "network": "tailscale",
+    "protocols": ["openai", "anthropic", "gemini"],
+    "models": [
+      "gemini-3-flash",
+      "gemini-3-pro-low",
+      "gemini-3-pro-high",
+      "gemini-2.5-flash",
+      "gemini-2.5-flash-thinking",
+      "gemini-3-pro-image",
+      "claude-opus-4-6-thinking",
+      "claude-opus-4-6",
+      "claude-sonnet-4-5",
+      "claude-sonnet-4-5-thinking"
+    ],
+    "auto_rotation": true
   },
   "servers": {
     "vps1": {
@@ -38,7 +62,7 @@
   },
   "networks": {
     "tailscale": {
-      "mesh": ["vps1", "vps2", "unraid"],
+      "mesh": ["vps1", "vps2", "unraid", "vm1"],
       "status": "active"
     },
     "atn_bridge": {
@@ -51,19 +75,20 @@
       "mcp-memory",
       "mcp-filesystem",
       "mcp-fetch",
-      "mcp-git",
       "mcp-playwright",
       "mcp-time",
+      "mcp-docker",
+      "mcp-sequentialthinking",
       "github-mcp-server",
       "perplexity-ask",
-      "mcp-sequentialthinking"
+      "context7"
     ],
     "planned": ["mcp-obsidian", "mcp-redis", "mcp-qdrant"]
   },
   "optimization_notes": {
     "parallel_research": "Use multiple Perplexity accounts for parallel queries",
-    "model_distribution": "Distribute Gemini load across 15 accounts",
-    "storage": "OneDrive for persistent artifact backup",
+    "model_distribution": "AG Proxy auto-rotates across all configured accounts",
+    "storage": "Google Drive for media/branding, OneDrive for artifact backup",
     "networking": "Tailscale mesh for secure cross-server comms"
   }
 }
