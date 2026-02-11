@@ -1,9 +1,9 @@
 # Antigravity Pipeline
 
-> **Version**: 2.0.0  
-> **Updated**: 2026-02-03
+> **Version**: 2.1.0
+> **Updated**: 2026-02-11
 
-Robust 6-phase agentic workflow pipeline with 12 specialist personas, context engineering skills, and intelligent model tiering.
+Robust 6-phase agentic workflow pipeline with 12 specialist personas, context engineering skills, and intelligent model tiering via AG Manager Proxy.
 
 ## Quick Start
 
@@ -17,7 +17,7 @@ cp -r skills/* ~/.gemini/antigravity/skills/
 
 ## Structure
 
-```
+```text
  GEMINI.md                    # Global rules (pipeline enforcement)
  global_workflows/
    ├── pipeline/                # 6-phase workflow
@@ -47,26 +47,30 @@ cp -r skills/* ~/.gemini/antigravity/skills/
        └── health-check.md
  skills/
     ├── manifest.yaml           # 100+ indexed skills
- context-compression/    # Token reduction    ├
- context-optimization/   # Attention optimization    ├
+    ├── context-compression/    # Token reduction
+    ├── context-optimization/   # Attention optimization
     └── filesystem-context/     # File-based offloading
 ```
 
-## Model Tiering
+## Model Tiering (via AG Proxy)
 
-| Phase | Model | Purpose |
-|-------|-------|---------|
-| Triage | Opus 4.5 Thinking | High-stakes evaluation |
-| Decomposition | Opus 4.5 Thinking | Complex reasoning |
-| Simple Execution | Gemini Flash | Fast, simple tasks |
-| Standard Execution | Sonnet / Gemini Pro | Load distribution |
-| Security Review | Opus 4.5 | No shortcuts |
+> GUI default: `gemini-3-flash` — pipeline decides escalation.
+
+| Phase                 | Model                     | Proxy ID                                 |
+| --------------------- | ------------------------- | ---------------------------------------- |
+| GUI Entry/Triage      | Gemini 3 Flash            | `gemini-3-flash`                         |
+| Simple Execution      | Gemini 2.5 Flash          | `gemini-2.5-flash`                       |
+| Standard Execution    | Sonnet 4.5 / Gemini 3 Pro | `claude-sonnet-4-5` / `gemini-3-pro-low` |
+| Complex Reasoning     | Gemini 3 Pro High         | `gemini-3-pro-high`                      |
+| Architecture/Security | Opus 4.6 Thinking         | `claude-opus-4-6-thinking`               |
+| Image Generation      | Gemini 3 Pro Image        | `gemini-3-pro-image`                     |
 
 ## Features
 
 - **Mandatory Pipeline**: ALL input goes through triage
+- **AG Proxy Integration**: 9 models with auto-rotation across accounts
 - **Context Engineering**: Compression, optimization, filesystem offloading
-- **MCP Integration**: Memory, sequential thinking, playwright
+- **MCP Integration**: Memory, sequential thinking, playwright, docker, context7
 - **14 File-Type Linters**: md, sh, py, json, yaml, go, ts, js, etc.
 - **Security-First**: PR lifecycle with secret scanning
 

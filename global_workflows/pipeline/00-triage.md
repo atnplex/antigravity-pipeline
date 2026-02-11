@@ -1,17 +1,19 @@
 ---
 name: Triage
 description: Initial processing of ALL user requests
-model: claude-opus-4.5-thinking
+model: claude-opus-4-6-thinking
 ---
 
 # Phase 0: Triage Pipeline
 
 > [!IMPORTANT]
 > ALL user input MUST go through this phase first. No exceptions.
+> GUI default is `gemini-3-flash` — triage escalates to stronger models as needed.
 
 ## Model Selection
 
-**REQUIRED: Claude Opus 4.5 Thinking**
+**Default**: `gemini-3-flash` (GUI entry point)
+**Escalate to**: `claude-opus-4-6-thinking` for complex triage
 
 Triage requires deep reasoning for:
 
@@ -26,13 +28,13 @@ Triage requires deep reasoning for:
 
 Analyze user input for:
 
-| Factor | Assessment |
-|--------|------------|
-| **Specificity** | Direct command or needs clarification? |
-| **Complexity** | Simple (1-2 steps) or Complex (needs decomposition)? |
-| **Domain** | Frontend / Backend / DevOps / Security / Mixed? |
-| **Scope** | Single file / Multi-file / Multi-component? |
-| **Risk** | Low / Medium / High / Critical? |
+| Factor           | Assessment                                           |
+| ---------------- | ---------------------------------------------------- |
+| **Specificity**  | Direct command or needs clarification?               |
+| **Complexity**   | Simple (1-2 steps) or Complex (needs decomposition)? |
+| **Domain**       | Frontend / Backend / DevOps / Security / Mixed?      |
+| **Scope**        | Single file / Multi-file / Multi-component?          |
+| **Risk**         | Low / Medium / High / Critical?                      |
 
 ### Complexity Indicators
 
@@ -50,7 +52,7 @@ Analyze user input for:
 - Test writing
 - Documentation
 
-**Complex** (Opus 4.5 required):
+**Complex** (Opus 4.6 required):
 
 - Architecture decisions
 - Security changes
@@ -100,7 +102,7 @@ Flag if request involves:
 - [ ] User data processing
 - [ ] Command execution
 
-If ANY flagged → **Require Opus 4.5 + Security Auditor persona**
+If ANY flagged → **Require Opus 4.6 + Security Auditor persona**
 
 ### Breaking Change Check
 
@@ -131,7 +133,7 @@ Present user with structured choices:
 
 **B) Detailed Path** (~45 min)
 - Full planning → decomposition → execution → verification
-- Model: Opus Thinking → Sonnet
+- Model: Opus 4.6 Thinking → Sonnet
 - Best for: Complex tasks, architecture
 - Risk: Minimal (thorough review)
 
